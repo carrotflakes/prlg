@@ -1,6 +1,6 @@
 pub mod macros;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 #[derive(Debug)]
 pub enum UserData {
@@ -13,7 +13,7 @@ pub enum UserData {
 #[derive(Debug, Clone)]
 pub enum Data {
     Variable(usize),
-    Symbol(String),
+    Symbol(Rc<String>),
     Term(Vec<Data>),
 }
 
@@ -58,9 +58,81 @@ pub struct Rule {
     body_var_num: usize,
 }
 
-impl From<Vec<UserData>> for Rule {
-    fn from(v: Vec<UserData>) -> Self {
-        let mut scope = VariableScope::new();
+pub struct SymbolScope(HashMap<Rc<String>, Rc<String>>);
+
+impl SymbolScope {
+    pub fn new() -> Self {
+        SymbolScope(Default::default())
+    }
+
+    pub fn get(&mut self, string: Rc<String>) -> Rc<String> {
+        if let Some(r) = self.0.get(&string) {
+            r.clone()
+        } else {
+            self.0.insert(string.clone(), string.clone());
+            string
+        }
+    }
+}
+
+pub struct VariableScope<'a>(&'a mut SymbolScope, HashMap<String, Data>);
+
+impl<'a> VariableScope<'a> {
+    pub fn new(ss: &'a mut SymbolScope) -> Self {
+        VariableScope(ss, Default::default())
+    }
+
+    pub fn new_data(&mut self, data: &UserData) -> Data {
+        let n = self.1.len();
+        match data {
+            UserData::Variable(v) => match self.1.entry(v.clone()) {
+                std::collections::hash_map::Entry::Occupied(data) => data.get().clone(),
+                std::collections::hash_map::Entry::Vacant(e) => {
+                    let data = Data::Variable(n);
+                    e.insert(data.clone());
+                    data
+                }
+            },
+            UserData::Wildcard => {
+                let data = Data::Variable(n);
+                self.1.insert(format!("unnamed:{}", n), data.clone());
+                data
+            }
+            UserData::Term(v) => Data::Term(v.iter().map(|x| self.new_data(x)).collect()),
+            UserData::Symbol(s) => Data::Symbol(self.0.get(Rc::new(s.clone()))),
+        }
+    }
+
+    pub fn new_data_vec(&mut self, slice: &[UserData]) -> Vec<Data> {
+        slice.iter().map(|x| self.new_data(x)).collect()
+    }
+}
+
+pub struct World {
+    pub rules: Vec<Rule>,
+    pub symbol_scope: SymbolScope,
+}
+
+impl World {
+    pub fn new(rules: Vec<Vec<UserData>>) -> Self {
+        let mut world = Self {
+            rules: vec![],
+            symbol_scope: SymbolScope::new(),
+        };
+        for rule in rules {
+            let rule = world.make_rule(rule);
+            world.rules.push(rule);
+        }
+        world
+    }
+
+    pub fn run<F: Fn(&Context)>(&mut self, data_slice: &[UserData], f: &F) {
+        let goals = VariableScope::new(&mut self.symbol_scope).new_data_vec(data_slice);
+        Context::new(&self, goals).run(f);
+    }
+
+    fn make_rule(&mut self, v: Vec<UserData>) -> Rule {
+        let mut scope = VariableScope::new(&mut self.symbol_scope);
         let mut it = v.iter().map(|x| scope.new_data(x));
         let head = it.next().unwrap();
         let body = it.rev().collect::<Vec<_>>();
@@ -76,55 +148,6 @@ impl From<Vec<UserData>> for Rule {
             head,
             body,
         }
-    }
-}
-
-pub struct VariableScope(HashMap<String, Data>);
-
-impl VariableScope {
-    pub fn new() -> Self {
-        VariableScope(Default::default())
-    }
-
-    pub fn new_data(&mut self, data: &UserData) -> Data {
-        let n = self.0.len();
-        match data {
-            UserData::Variable(v) => match self.0.entry(v.clone()) {
-                std::collections::hash_map::Entry::Occupied(data) => data.get().clone(),
-                std::collections::hash_map::Entry::Vacant(e) => {
-                    let data = Data::Variable(n);
-                    e.insert(data.clone());
-                    data
-                }
-            },
-            UserData::Wildcard => {
-                let data = Data::Variable(n);
-                self.0.insert(format!("unnamed:{}", n), data.clone());
-                data
-            }
-            UserData::Term(v) => Data::Term(v.iter().map(|x| self.new_data(x)).collect()),
-            UserData::Symbol(s) => Data::Symbol(s.clone()),
-        }
-    }
-
-    pub fn new_data_vec(&mut self, slice: &[UserData]) -> Vec<Data> {
-        slice.iter().map(|x| self.new_data(x)).collect()
-    }
-}
-
-pub struct World {
-    pub rules: Vec<Rule>,
-}
-
-impl World {
-    pub fn new(rules: Vec<Vec<UserData>>) -> Self {
-        Self {
-            rules: rules.into_iter().map(|x| x.into()).collect(),
-        }
-    }
-
-    pub fn run<F: Fn(&Context)>(&self, data_slice: &[UserData], f: &F) {
-        Context::new(&self, VariableScope::new().new_data_vec(data_slice)).run(f);
     }
 }
 
@@ -247,7 +270,7 @@ impl<'a> Context<'a> {
                 true
             }
 
-            (Data::Symbol(l), Data::Symbol(r)) => l == r,
+            (Data::Symbol(l), Data::Symbol(r)) => Rc::ptr_eq(l, r),
 
             (Data::Term(l), Data::Term(r)) => {
                 if l.len() != r.len() {

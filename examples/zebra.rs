@@ -52,7 +52,7 @@ fn main() {
             (member (house {z} zebra {} {} {}) {h})
         }
     ];
-    let world = World::new(rules);
+    let mut world = World::new(rules);
 
     world.run(&[data! {(zebra {h} {w} {z})}],&|c| c.print());
 
