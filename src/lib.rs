@@ -65,7 +65,7 @@ impl SymbolScope {
         SymbolScope(Default::default())
     }
 
-    pub fn get(&mut self, string: Rc<String>) -> Rc<String> {
+    pub fn get_and_insert(&mut self, string: Rc<String>) -> Rc<String> {
         if let Some(r) = self.0.get(&string) {
             r.clone()
         } else {
@@ -73,19 +73,31 @@ impl SymbolScope {
             string
         }
     }
+
+    pub fn get(&self, string: Rc<String>) -> Rc<String> {
+        if let Some(r) = self.0.get(&string) {
+            r.clone()
+        } else {
+            string
+        }
+    }
 }
 
-pub struct VariableScope<'a>(&'a mut SymbolScope, HashMap<String, Data>);
+pub struct VariableScope(HashMap<String, Data>);
 
-impl<'a> VariableScope<'a> {
-    pub fn new(ss: &'a mut SymbolScope) -> Self {
-        VariableScope(ss, Default::default())
+impl VariableScope {
+    pub fn new() -> Self {
+        VariableScope(Default::default())
     }
 
-    pub fn new_data(&mut self, data: &UserData) -> Data {
-        let n = self.1.len();
+    pub fn new_data(
+        &mut self,
+        data: &UserData,
+        get_str: &mut impl FnMut(Rc<String>) -> Rc<String>,
+    ) -> Data {
+        let n = self.0.len();
         match data {
-            UserData::Variable(v) => match self.1.entry(v.clone()) {
+            UserData::Variable(v) => match self.0.entry(v.clone()) {
                 std::collections::hash_map::Entry::Occupied(data) => data.get().clone(),
                 std::collections::hash_map::Entry::Vacant(e) => {
                     let data = Data::Variable(n);
@@ -95,16 +107,20 @@ impl<'a> VariableScope<'a> {
             },
             UserData::Wildcard => {
                 let data = Data::Variable(n);
-                self.1.insert(format!("unnamed:{}", n), data.clone());
+                self.0.insert(format!("unnamed:{}", n), data.clone());
                 data
             }
-            UserData::Term(v) => Data::Term(v.iter().map(|x| self.new_data(x)).collect()),
-            UserData::Symbol(s) => Data::Symbol(self.0.get(Rc::new(s.clone()))),
+            UserData::Term(v) => Data::Term(v.iter().map(|x| self.new_data(x, get_str)).collect()),
+            UserData::Symbol(s) => Data::Symbol(get_str(Rc::new(s.clone()))),
         }
     }
 
-    pub fn new_data_vec(&mut self, slice: &[UserData]) -> Vec<Data> {
-        slice.iter().map(|x| self.new_data(x)).collect()
+    pub fn new_data_vec(
+        &mut self,
+        slice: &[UserData],
+        get_str: &mut impl FnMut(Rc<String>) -> Rc<String>,
+    ) -> Vec<Data> {
+        slice.iter().map(|x| self.new_data(x, get_str)).collect()
     }
 }
 
@@ -120,20 +136,21 @@ impl World {
             symbol_scope: SymbolScope::new(),
         };
         for rule in rules {
-            let rule = world.make_rule(rule);
+            let rule = World::make_rule(rule, &mut |s| world.symbol_scope.get_and_insert(s));
             world.rules.push(rule);
         }
         world
     }
 
-    pub fn run<F: Fn(&Context)>(&mut self, data_slice: &[UserData], f: &F) {
-        let goals = VariableScope::new(&mut self.symbol_scope).new_data_vec(data_slice);
+    pub fn run<F: Fn(&Context)>(&self, data_slice: &[UserData], f: &F) {
+        let goals =
+            VariableScope::new().new_data_vec(data_slice, &mut |s| self.symbol_scope.get(s));
         Context::new(&self, goals).run(f);
     }
 
-    fn make_rule(&mut self, v: Vec<UserData>) -> Rule {
-        let mut scope = VariableScope::new(&mut self.symbol_scope);
-        let mut it = v.iter().map(|x| scope.new_data(x));
+    fn make_rule(v: Vec<UserData>, get_str: &mut impl FnMut(Rc<String>) -> Rc<String>) -> Rule {
+        let mut scope = VariableScope::new();
+        let mut it = v.iter().map(|x| scope.new_data(x, get_str));
         let head = it.next().unwrap();
         let body = it.rev().collect::<Vec<_>>();
         let head_var_num = head.max_var();

@@ -42,7 +42,7 @@ fn main() {
     ];
 
     // dbg!(&rules);
-    let mut world = World::new(rules);
+    let world = World::new(rules);
     // dbg!(&world.rules);
 
     world.run(&[data! {(all_pokemon {nyan})}],&|c| c.print());
