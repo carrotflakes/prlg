@@ -32,6 +32,25 @@ impl Data {
     }
 }
 
+impl std::fmt::Display for Data {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Data::Variable(n) => write!(f, "{{{}}}", n),
+            Data::Symbol(s) => write!(f, "{}", s),
+            Data::Term(v) => {
+                write!(f, "(")?;
+                if let Some(d) = v.first() {
+                    write!(f, "{}", d)?;
+                }
+                for d in &v[1..] {
+                    write!(f, " {}", d)?;
+                }
+                write!(f, ")")
+            },
+        }
+    }
+}
+
 pub struct Rule {
     head: Data,
     body: Vec<Data>,
@@ -257,7 +276,7 @@ impl<'a> Context<'a> {
     pub fn print(&self) {
         for g in &self.initial_goals {
             println!(
-                "{:?}",
+                "{}",
                 self.instant(Instance {
                     data: g.get_ref(),
                     base: 0
