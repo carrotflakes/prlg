@@ -4,11 +4,6 @@ extern crate prlg;
 use prlg::{Context, VariableScope, World};
 
 fn main() {
-    // let types = vec![(
-    //     "bool".to_string(),
-    //     vec!["true".to_string(), "false".to_string()],
-    // )];
-
     let rules = rules![
         (yo {x})
         (hoge fuga)

@@ -1,25 +1,25 @@
 #[macro_export]
 macro_rules! term {
     ($($e:expr),*) => {
-        ::std::rc::Rc::new(::prlg::UserData::Term(vec![$($e),*]))
+        ::prlg::UserData::Term(vec![$($e),*])
     };
 }
 #[macro_export]
 macro_rules! var {
     ($i:ident) => {
-        ::std::rc::Rc::new(::prlg::UserData::Variable(stringify!($i).to_string()))
+        ::prlg::UserData::Variable(stringify!($i).to_string())
     };
 }
 #[macro_export]
 macro_rules! wild {
     () => {
-        ::std::rc::Rc::new(::prlg::UserData::Wildcard)
+        ::prlg::UserData::Wildcard
     };
 }
 #[macro_export]
 macro_rules! sym {
     ($i:ident) => {
-        ::std::rc::Rc::new(::prlg::UserData::Symbol(stringify!($i).to_string()))
+        ::prlg::UserData::Symbol(stringify!($i).to_string())
     };
 }
 

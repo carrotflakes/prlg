@@ -1,20 +1,20 @@
 pub mod macros;
 
-use std::{collections::HashMap, rc::Rc, usize};
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub enum UserData {
     Variable(String),
     Wildcard,
     Symbol(String),
-    Term(Vec<Rc<UserData>>),
+    Term(Vec<UserData>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Data {
     Variable(usize),
     Symbol(String),
-    Term(Vec<Rc<Data>>),
+    Term(Vec<Data>),
 }
 
 impl Data {
@@ -25,17 +25,22 @@ impl Data {
             Data::Term(v) => v.iter().map(|x| x.max_var() + 1).max().unwrap_or(0),
         }
     }
+
+    #[inline]
+    fn get_ref(&self) -> &'static Data {
+        unsafe { std::mem::transmute::<_, &'static Data>(self) }
+    }
 }
 
 pub struct Rule {
-    head: Rc<Data>,
-    body: Vec<Rc<Data>>,
+    head: Data,
+    body: Vec<Data>,
     head_var_num: usize,
     body_var_num: usize,
 }
 
-impl From<Vec<Rc<UserData>>> for Rule {
-    fn from(v: Vec<Rc<UserData>>) -> Self {
+impl From<Vec<UserData>> for Rule {
+    fn from(v: Vec<UserData>) -> Self {
         let mut scope = VariableScope::new();
         let mut it = v.iter().map(|x| scope.new_data(x));
         let head = it.next().unwrap();
@@ -55,35 +60,35 @@ impl From<Vec<Rc<UserData>>> for Rule {
     }
 }
 
-pub struct VariableScope(HashMap<String, Rc<Data>>);
+pub struct VariableScope(HashMap<String, Data>);
 
 impl VariableScope {
     pub fn new() -> Self {
         VariableScope(Default::default())
     }
 
-    pub fn new_data(&mut self, data: &Rc<UserData>) -> Rc<Data> {
+    pub fn new_data(&mut self, data: &UserData) -> Data {
         let n = self.0.len();
-        match data.as_ref() {
+        match data {
             UserData::Variable(v) => match self.0.entry(v.clone()) {
                 std::collections::hash_map::Entry::Occupied(data) => data.get().clone(),
                 std::collections::hash_map::Entry::Vacant(e) => {
-                    let data = Rc::new(Data::Variable(n));
+                    let data = Data::Variable(n);
                     e.insert(data.clone());
                     data
                 }
             },
-            &UserData::Wildcard => {
-                let data = Rc::new(Data::Variable(n));
+            UserData::Wildcard => {
+                let data = Data::Variable(n);
                 self.0.insert(format!("unnamed:{}", n), data.clone());
                 data
-            },
-            UserData::Term(v) => Rc::new(Data::Term(v.iter().map(|x| self.new_data(x)).collect())),
-            UserData::Symbol(s) => Rc::new(Data::Symbol(s.clone())),
+            }
+            UserData::Term(v) => Data::Term(v.iter().map(|x| self.new_data(x)).collect()),
+            UserData::Symbol(s) => Data::Symbol(s.clone()),
         }
     }
 
-    pub fn new_data_vec(&mut self, slice: &[Rc<UserData>]) -> Vec<Rc<Data>> {
+    pub fn new_data_vec(&mut self, slice: &[UserData]) -> Vec<Data> {
         slice.iter().map(|x| self.new_data(x)).collect()
     }
 }
@@ -93,7 +98,7 @@ pub struct World {
 }
 
 impl World {
-    pub fn new(rules: Vec<Vec<Rc<UserData>>>) -> Self {
+    pub fn new(rules: Vec<Vec<UserData>>) -> Self {
         Self {
             rules: rules.into_iter().map(|x| x.into()).collect(),
         }
@@ -102,28 +107,44 @@ impl World {
 
 #[derive(Clone)]
 struct Instance {
-    data: Rc<Data>,
+    data: &'static Data,
     base: usize,
+}
+
+impl Instance {
+    #[inline]
+    fn new(data: &Data, base: usize) -> Instance {
+        Instance {
+            data: data.get_ref(),
+            base,
+        }
+    }
 }
 
 pub struct Context<'a> {
     world: &'a World,
+    initial_goals: Vec<Data>,
     bindings: Vec<Option<Instance>>,
     indices: Vec<usize>,
     goals: Vec<Instance>,
-    initial_goals: Vec<Instance>,
 }
 
 impl<'a> Context<'a> {
-    pub fn new(world: &'a World, goals: Vec<Rc<Data>>) -> Self {
-        let offset = goals.iter().map(|d| d.max_var()).max().unwrap_or(0);
-        let goals = goals.into_iter().map(|g| Instance {data: g, base: 0}).collect::<Vec<_>>();
+    pub fn new(world: &'a World, initial_goals: Vec<Data>) -> Self {
+        let offset = initial_goals.iter().map(|d| d.max_var()).max().unwrap_or(0);
+        let goals = initial_goals
+            .iter()
+            .map(|g| Instance {
+                data: g.get_ref(),
+                base: 0,
+            })
+            .collect::<Vec<_>>();
         Self {
             world,
             bindings: vec![None; offset],
             indices: Vec::new(),
-            goals: goals.clone(),
-            initial_goals: goals,
+            goals,
+            initial_goals,
         }
     }
 
@@ -134,13 +155,11 @@ impl<'a> Context<'a> {
             let goal_num = self.goals.len();
 
             for rule in &self.world.rules {
-                let head = self.new_data(&rule.head, bindings_len);
+                let head = Instance::new(&rule.head, bindings_len);
                 self.bindings.resize(bindings_len + rule.head_var_num, None);
                 if self.unify(goal.clone(), head) {
-                    for data in rule.body.iter() {
-                        let data = self.new_data(data, bindings_len);
-                        self.goals.push(data);
-                    }
+                    self.goals
+                        .extend(rule.body.iter().map(|d| Instance::new(d, bindings_len)));
                     self.bindings.resize(bindings_len + rule.body_var_num, None);
                     self.run(f);
                 }
@@ -151,56 +170,57 @@ impl<'a> Context<'a> {
             self.bindings.truncate(bindings_len);
             self.goals.push(goal);
         } else {
-            // dbg!(&self.bindings, &self.indices);
             f(self);
         }
     }
 
-    fn instant(&self, instance: Instance) -> Rc<Data> {
-        match instance.data.as_ref() {
+    fn instant(&self, instance: Instance) -> Data {
+        match &instance.data {
             Data::Variable(n) => {
-                if let Some(d) = &self.bindings[instance.base + *n] {
+                if let Some(d) = &self.bindings[instance.base + n] {
                     self.instant(d.clone())
                 } else {
                     instance.data.clone()
                 }
             }
-            Data::Term(ds) => Rc::new(Data::Term(ds.iter().map(|d| self.instant(Instance {data: d.clone(), base: instance.base})).collect())),
+            Data::Term(ds) => Data::Term(
+                ds.iter()
+                    .map(|d| self.instant(Instance::new(d, instance.base)))
+                    .collect(),
+            ),
             _ => instance.data.clone(),
         }
     }
 
+    #[inline]
+    fn resolve(&self, mut instance: Instance) -> Instance {
+        loop {
+            if let Data::Variable(n) = instance.data {
+                if let Some(d) = &self.bindings[instance.base + n] {
+                    instance = d.clone();
+                    continue;
+                }
+            }
+            break;
+        }
+        instance
+    }
+
     fn unify(&mut self, mut left: Instance, mut right: Instance) -> bool {
-        loop {
-            if let Data::Variable(n) = left.data.as_ref() {
-                if let Some(d) = &self.bindings[left.base + *n] {
-                    left = d.clone();
-                    continue;
-                }
-            }
-            break;
-        }
-        loop {
-            if let Data::Variable(n) = right.data.as_ref() {
-                if let Some(d) = &self.bindings[right.base + *n] {
-                    right = d.clone();
-                    continue;
-                }
-            }
-            break;
+        left = self.resolve(left);
+        right = self.resolve(right);
+
+        if left.base == right.base && left.data as *const Data == right.data {
+            return true;
         }
 
-        if left.base == right.base && Rc::ptr_eq(&left.data, &right.data) {
-            return true;// TODO
-        }
-
-        match (left.data.as_ref(), right.data.as_ref()) {
+        match (&left.data, &right.data) {
             (Data::Variable(n), _) => {
-                self.bind(left.base + *n, right);
+                self.bind(left.base + n, right);
                 true
             }
             (_, Data::Variable(n)) => {
-                self.bind(right.base +*n, left);
+                self.bind(right.base + n, left);
                 true
             }
 
@@ -210,12 +230,9 @@ impl<'a> Context<'a> {
                 if l.len() != r.len() {
                     return false;
                 }
-                for (l, r) in l.iter().zip(r.iter()) {
-                    if !self.unify(Instance {data: l.clone(), base: left.base}, Instance {data: r.clone(), base: right.base}) {
-                        return false;
-                    }
-                }
-                true
+                l.iter().zip(r.iter()).all(|(l, r)| {
+                    self.unify(Instance::new(l, left.base), Instance::new(r, right.base))
+                })
             }
 
             (Data::Symbol(_), Data::Term(_)) => false,
@@ -237,17 +254,15 @@ impl<'a> Context<'a> {
         self.indices.truncate(len);
     }
 
-    #[inline]
-    fn new_data(&mut self, data: &Rc<Data>, base: usize) -> Instance {
-        Instance {
-            data: data.clone(),
-            base,
-        }
-    }
-
     pub fn print(&self) {
         for g in &self.initial_goals {
-            println!("{:?}", self.instant(g.clone()));
+            println!(
+                "{:?}",
+                self.instant(Instance {
+                    data: g.get_ref(),
+                    base: 0
+                })
+            );
         }
     }
 }

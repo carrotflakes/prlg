@@ -55,6 +55,12 @@ fn main() {
     ];
     let world = World::new(rules);
 
+    Context::new(
+        &world,
+        VariableScope::new().new_data_vec(&[data! {(zebra {h} {w} {z})}]),
+    )
+    .run(&|c|c.print());
+
     let s = std::time::Instant::now();
     for _ in 0..1000 {
         Context::new(
