@@ -4,7 +4,6 @@ extern crate prlg;
 use prlg::{Context, VariableScope, World};
 
 fn main() {
-    println!();
     let rules = rules![
         (eq {x} {x})
 
