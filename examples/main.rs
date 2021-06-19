@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate prlg;
 
-use prlg::{Context, VariableScope, World};
+use prlg::World;
 
 fn main() {
     let rules = rules![
@@ -45,27 +45,12 @@ fn main() {
     let world = World::new(rules);
     // dbg!(&world.rules);
 
-    Context::new(
-        &world,
-        VariableScope::new().new_data_vec(&[data! {(all_pokemon {nyan})}]),
-    )
-    .run(&|c|c.print());
-
-    Context::new(
-        &world,
-        VariableScope::new().new_data_vec(&[data! {(append (cons a nil) (cons b nil) {nyan})}]),
-    )
-    .run(&|c|c.print());
-
-    Context::new(
-        &world,
-        VariableScope::new().new_data_vec(&[data! {(my_list {nyan})}]),
-    )
-    .run(&|c|c.print());
-
-    Context::new(
-        &world,
-        VariableScope::new().new_data_vec(&[data! {(perm {nyan})}]),
-    )
-    .run(&|c|c.print());
+    world.run(&[data! {(all_pokemon {nyan})}],&|c| c.print());
+    println!();
+    world.run(&[data! {(append (cons a nil) (cons b nil) {nyan})}],&|c| c.print());
+    println!();
+    world.run(&[data! {(my_list {nyan})}],&|c| c.print());
+    println!();
+    world.run(&[data! {(perm {nyan})}],&|c| c.print());
+    println!();
 }

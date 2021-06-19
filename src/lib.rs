@@ -46,7 +46,7 @@ impl std::fmt::Display for Data {
                     write!(f, " {}", d)?;
                 }
                 write!(f, ")")
-            },
+            }
         }
     }
 }
@@ -121,6 +121,10 @@ impl World {
         Self {
             rules: rules.into_iter().map(|x| x.into()).collect(),
         }
+    }
+
+    pub fn run<F: Fn(&Context)>(&self, data_slice: &[UserData], f: &F) {
+        Context::new(&self, VariableScope::new().new_data_vec(data_slice)).run(f);
     }
 }
 
