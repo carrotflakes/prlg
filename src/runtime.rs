@@ -4,13 +4,13 @@ use crate::{
     world::World,
 };
 
-pub struct Context<'a, F: Fn(&[Data])> {
+pub struct Runtime<'a, F: Fn(&[Data])> {
     world: &'a World,
     initial_goals: Vec<Data>,
     resolved_fn: &'a F,
 }
 
-impl<'a, F: Fn(&[Data])> Context<'a, F> {
+impl<'a, F: Fn(&[Data])> Runtime<'a, F> {
     pub fn run(world: &'a World, initial_goals: Vec<Data>, resolved_fn: &'a F) {
         let base = initial_goals.iter().map(|d| d.max_var()).max().unwrap_or(0);
         let mut bindings = Bindings::new();
