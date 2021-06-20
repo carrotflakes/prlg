@@ -28,6 +28,29 @@ impl std::fmt::Display for Data {
             Data::Variable(n) => write!(f, "{{{}}}", n),
             Data::Symbol(s) => write!(f, "{}", s),
             Data::Term(v) => {
+                if v.first().map(|d| if let Data::Symbol(s) = d {s.as_str() == "cons" } else {false}).unwrap_or(false) {
+                    fn g(f: &mut std::fmt::Formatter<'_>, d: &Data, first: bool) -> std::fmt::Result {
+                        if let Data::Symbol(s) = d {
+                            if s.as_str() == "nil" {
+                                return write!(f, "]");
+                            }
+                        }
+                        if !first {
+                            write!(f, " ")?;
+                        }
+                        if let Data::Term(v) = d {
+                            if let Some(Data::Symbol(s)) = v.first() {
+                                if v.len() == 3 && s.as_str() == "cons" {
+                                    write!(f, "{}", &v[1])?;
+                                    return g(f, &v[2], false);
+                                }
+                            }
+                        }
+                        write!(f, ". {}]", d)
+                    }
+                    write!(f, "[")?;
+                    return g(f, self, true);
+                }
                 write!(f, "(")?;
                 if let Some(d) = v.first() {
                     write!(f, "{}", d)?;
