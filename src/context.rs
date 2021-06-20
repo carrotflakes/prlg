@@ -43,7 +43,6 @@ impl<'a, F: Fn(&[Data])> Context<'a, F> {
                 goals.truncate(goal_num);
             }
 
-            binder.dealloc();
             goals.push(goal);
         } else {
             let datas = self

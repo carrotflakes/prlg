@@ -160,3 +160,10 @@ impl<'a> Binder<'a> {
         self.bindings.indices.truncate(self.indices_len);
     }
 }
+
+impl<'a> Drop for Binder<'a> {
+    #[inline]
+    fn drop(&mut self) {
+        self.dealloc()
+    }
+}
