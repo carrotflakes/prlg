@@ -1,5 +1,6 @@
 pub mod bindings;
 pub mod data;
+pub mod interactive_runtime;
 pub mod macros;
 pub mod rule_map;
 pub mod runtime;
