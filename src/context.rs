@@ -1,59 +1,57 @@
 use crate::{
-    bindings::{Bindings, Instance},
+    bindings::{Binder, Bindings, Instance},
     data::Data,
     world::World,
 };
 
-pub struct Context<'a> {
+pub struct Context<'a, F: Fn(&[Data])> {
     world: &'a World,
     initial_goals: Vec<Data>,
-    goals: Vec<Instance>,
-    bindings: Bindings,
+    resolved_fn: &'a F,
 }
 
-impl<'a> Context<'a> {
-    pub fn new(world: &'a World, initial_goals: Vec<Data>) -> Self {
-        let offset = initial_goals.iter().map(|d| d.max_var()).max().unwrap_or(0);
-        let goals = initial_goals
-            .iter()
-            .map(|g| Instance::new(g.get_ref(), 0))
-            .collect::<Vec<_>>();
+impl<'a, F: Fn(&[Data])> Context<'a, F> {
+    pub fn run(world: &'a World, initial_goals: Vec<Data>, resolved_fn: &'a F) {
+        let base = initial_goals.iter().map(|d| d.max_var()).max().unwrap_or(0);
+        let mut bindings = Bindings::new();
+        let mut binder = bindings.binder();
+        let mut goals = binder.instances(&initial_goals);
+        binder.alloc(base);
         Self {
             world,
-            bindings: Bindings::new(vec![None; offset], Vec::new()),
-            goals,
             initial_goals,
+            resolved_fn,
         }
+        .step(&mut goals, &mut binder);
     }
 
-    pub fn run<F: Fn(&Self)>(&mut self, f: &F) {
-        if let Some(goal) = self.goals.pop() {
-            let (bindings_len, indices_len) = self.bindings.check();
-            let goal_num = self.goals.len();
+    #[inline]
+    fn step(&mut self, goals: &mut Vec<Instance>, binder: &mut Binder) {
+        if let Some(goal) = goals.pop() {
+            let mut binder = binder.child();
+            let goal_num = goals.len();
 
             for rule in &self.world.rules {
-                let head = Instance::new(&rule.head, bindings_len);
-                self.bindings.alloc(bindings_len + rule.head_var_num);
-                if self.bindings.unify(goal.clone(), head) {
-                    self.goals
-                        .extend(rule.body.iter().map(|d| Instance::new(d, bindings_len)));
-                    self.bindings.alloc(bindings_len + rule.body_var_num);
-                    self.run(f);
+                let head = binder.instance(&rule.head);
+                binder.alloc(rule.head_var_num);
+                if binder.unify(goal.clone(), head) {
+                    goals.extend(binder.instances(&rule.body));
+                    binder.alloc(rule.body_var_num);
+                    self.step(goals, &mut binder);
                 }
-                self.bindings.rewind(indices_len);
-                self.goals.truncate(goal_num);
+                binder.rewind();
+                goals.truncate(goal_num);
             }
 
-            self.bindings.rewind_bindings(bindings_len);
-            self.goals.push(goal);
+            binder.dealloc();
+            goals.push(goal);
         } else {
-            f(self);
-        }
-    }
-
-    pub fn print(&self) {
-        for g in &self.initial_goals {
-            println!("{}", self.bindings.instant(Instance::new(g.get_ref(), 0)));
+            let datas = self
+                .initial_goals
+                .iter()
+                .map(|d| binder.data(Instance::new(d, 0)))
+                .collect::<Vec<_>>();
+            (self.resolved_fn)(datas.as_slice());
         }
     }
 }

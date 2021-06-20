@@ -45,12 +45,12 @@ fn main() {
     let world = World::new(rules);
     // dbg!(&world.rules);
 
-    world.run(&[data! {(all_pokemon {nyan})}],&|c| c.print());
+    world.run(&[data! {(all_pokemon {nyan})}],&|c| for d in c {println!("{}", d)});
     println!();
-    world.run(&[data! {(append (cons a nil) (cons b nil) {nyan})}],&|c| c.print());
+    world.run(&[data! {(append (cons a nil) (cons b nil) {nyan})}],&|c| for d in c {println!("{}", d)});
     println!();
-    world.run(&[data! {(my_list {nyan})}],&|c| c.print());
+    world.run(&[data! {(my_list {nyan})}],&|c| for d in c {println!("{}", d)});
     println!();
-    world.run(&[data! {(perm {nyan})}],&|c| c.print());
+    world.run(&[data! {(perm {nyan})}],&|c| for d in c {println!("{}", d)});
     println!();
 }

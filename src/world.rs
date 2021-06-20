@@ -93,10 +93,10 @@ impl World {
         world
     }
 
-    pub fn run<F: Fn(&Context)>(&self, data_slice: &[UserData], f: &F) {
+    pub fn run<F: Fn(&[Data])>(&self, data_slice: &[UserData], resolved_fn: &F) {
         let goals =
             VariableScope::new().new_data_vec(data_slice, &mut |s| self.symbol_scope.get(s));
-        Context::new(&self, goals).run(f);
+        Context::run(&self, goals, resolved_fn);
     }
 
     fn make_rule(v: Vec<UserData>, get_str: &mut impl FnMut(Rc<String>) -> Rc<String>) -> Rule {

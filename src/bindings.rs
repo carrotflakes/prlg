@@ -24,27 +24,63 @@ pub struct Bindings {
 }
 
 impl Bindings {
-    pub fn new(bindings: Vec<Option<Instance>>, indices: Vec<usize>) -> Self {
-        Self { bindings, indices }
+    pub fn new() -> Self {
+        Self {
+            bindings: Vec::new(),
+            indices: Vec::new(),
+        }
+    }
+
+    pub fn binder<'a>(&'a mut self) -> Binder<'a> {
+        Binder {
+            bindings_len: self.bindings.len(),
+            indices_len: self.indices.len(),
+            bindings: self,
+        }
+    }
+}
+
+pub struct Binder<'a> {
+    bindings: &'a mut Bindings,
+    bindings_len: usize,
+    indices_len: usize,
+}
+
+impl<'a> Binder<'a> {
+    #[inline]
+    pub fn child(&mut self) -> Binder {
+        Binder {
+            bindings_len: self.bindings.bindings.len(),
+            indices_len: self.bindings.indices.len(),
+            bindings: self.bindings,
+        }
     }
 
     #[inline]
-    pub fn check(&self) -> (usize, usize) {
-        (self.bindings.len(), self.indices.len())
+    pub fn instance(&self, data: &Data) -> Instance {
+        Instance {
+            data: data.get_ref(),
+            base: self.bindings_len,
+        }
     }
 
-    pub fn instant(&self, instance: Instance) -> Data {
+    #[inline]
+    pub fn instances(&self, data: &[Data]) -> Vec<Instance> {
+        data.iter().map(|d| self.instance(d)).collect()
+    }
+
+    pub fn data(&self, instance: Instance) -> Data {
         match &instance.data {
             Data::Variable(n) => {
-                if let Some(d) = &self.bindings[instance.base + n] {
-                    self.instant(d.clone())
+                if let Some(d) = &self.bindings.bindings[instance.base + n] {
+                    self.data(d.clone())
                 } else {
                     instance.data.clone()
                 }
             }
             Data::Term(ds) => Data::Term(
                 ds.iter()
-                    .map(|d| self.instant(Instance::new(d, instance.base)))
+                    .map(|d| self.data(Instance::new(d, instance.base)))
                     .collect(),
             ),
             _ => instance.data.clone(),
@@ -55,7 +91,7 @@ impl Bindings {
     pub fn resolve(&self, mut instance: Instance) -> Instance {
         loop {
             if let Data::Variable(n) = instance.data {
-                if let Some(d) = &self.bindings[instance.base + n] {
+                if let Some(d) = &self.bindings.bindings[instance.base + n] {
                     instance = d.clone();
                     continue;
                 }
@@ -102,25 +138,25 @@ impl Bindings {
 
     #[inline]
     pub fn bind(&mut self, var_n: usize, instance: Instance) {
-        self.bindings[var_n] = Some(instance);
-        self.indices.push(var_n);
+        self.bindings.bindings[var_n] = Some(instance);
+        self.bindings.indices.push(var_n);
     }
 
     #[inline]
     pub fn alloc(&mut self, len: usize) {
-        self.bindings.resize(len, None);
+        self.bindings.bindings.resize(self.bindings_len + len, None);
     }
 
     #[inline]
-    pub fn rewind(&mut self, len: usize) {
-        for idx in &self.indices[len..] {
-            self.bindings[*idx] = None;
+    pub fn dealloc(&mut self) {
+        self.bindings.bindings.truncate(self.bindings_len);
+    }
+
+    #[inline]
+    pub fn rewind(&mut self) {
+        for idx in &self.bindings.indices[self.indices_len..] {
+            self.bindings.bindings[*idx] = None;
         }
-        self.indices.truncate(len);
-    }
-
-    #[inline]
-    pub fn rewind_bindings(&mut self, len: usize) {
-        self.bindings.truncate(len);
+        self.bindings.indices.truncate(self.indices_len);
     }
 }
