@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{context::Context, data::Data, user_data::UserData};
+use crate::{context::Context, data::Data, rule_map::RuleMap, user_data::UserData};
 
 pub struct Rule {
     pub head: Data,
@@ -78,19 +78,22 @@ impl VariableScope {
 pub struct World {
     pub rules: Vec<Rule>,
     pub symbol_scope: SymbolScope,
+    pub(crate) rule_map: RuleMap,
 }
 
 impl World {
     pub fn new(rules: Vec<Vec<UserData>>) -> Self {
-        let mut world = Self {
-            rules: vec![],
-            symbol_scope: SymbolScope::new(),
-        };
+        let mut symbol_scope = SymbolScope::new();
+        let mut rules_ = Vec::new();
         for rule in rules {
-            let rule = World::make_rule(rule, &mut |s| world.symbol_scope.get_and_insert(s));
-            world.rules.push(rule);
+            let rule = World::make_rule(rule, &mut |s| symbol_scope.get_and_insert(s));
+            rules_.push(rule);
         }
-        world
+        Self {
+            rule_map: RuleMap::from_rules(&rules_),
+            rules: rules_,
+            symbol_scope,
+        }
     }
 
     pub fn run<F: Fn(&[Data])>(&self, data_slice: &[UserData], resolved_fn: &F) {

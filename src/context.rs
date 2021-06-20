@@ -31,16 +31,18 @@ impl<'a, F: Fn(&[Data])> Context<'a, F> {
             let mut binder = binder.child();
             let goal_num = goals.len();
 
-            for rule in &self.world.rules {
+            for rule_index in self.get_rules(&goal) {
+                // for rule_index in 0..self.world.rules.len() {
+                let rule = &self.world.rules[rule_index];
                 let head = binder.instance(&rule.head);
                 binder.alloc(rule.head_var_num);
                 if binder.unify(goal.clone(), head) {
                     goals.extend(binder.instances(&rule.body));
                     binder.alloc(rule.body_var_num);
                     self.step(goals, &mut binder);
+                    goals.truncate(goal_num);
                 }
                 binder.rewind();
-                goals.truncate(goal_num);
             }
 
             goals.push(goal);
@@ -52,5 +54,13 @@ impl<'a, F: Fn(&[Data])> Context<'a, F> {
                 .collect::<Vec<_>>();
             (self.resolved_fn)(datas.as_slice());
         }
+    }
+
+    fn get_rules(&self, goal: &Instance) -> Vec<usize> {
+        self.world
+            .rule_map
+            .get(goal.data())
+            .map(|x| x.to_vec())
+            .unwrap_or_else(|| (0..self.world.rules.len()).collect())
     }
 }

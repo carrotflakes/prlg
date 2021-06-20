@@ -16,6 +16,10 @@ impl Instance {
             base,
         }
     }
+
+    pub fn data(&self) -> &Data {
+        self.data
+    }
 }
 
 pub struct Bindings {
