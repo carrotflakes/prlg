@@ -55,7 +55,7 @@ impl std::fmt::Display for Data {
                 if let Some(d) = v.first() {
                     write!(f, "{}", d)?;
                 }
-                for d in &v[1..] {
+                for d in &v[1..] { // TODO: check length
                     write!(f, " {}", d)?;
                 }
                 write!(f, ")")
