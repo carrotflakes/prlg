@@ -62,10 +62,7 @@ impl<'a> Binder<'a> {
 
     #[inline]
     pub fn instance(&self, data: &Data) -> Instance {
-        Instance {
-            data: data.get_ref(),
-            base: self.bindings_len,
-        }
+        Instance::new(data, self.bindings_len)
     }
 
     #[inline]
