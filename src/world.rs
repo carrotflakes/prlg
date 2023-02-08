@@ -96,7 +96,7 @@ impl World {
         }
     }
 
-    pub fn run<F: Fn(&[Data])>(&self, data_slice: &[UserData], resolved_fn: &F) {
+    pub fn run<F: FnMut(&[Data])>(&self, data_slice: &[UserData], resolved_fn: F) {
         let goals =
             VariableScope::new().new_data_vec(data_slice, &mut |s| self.symbol_scope.get(s));
         Runtime::run(&self, goals, resolved_fn);

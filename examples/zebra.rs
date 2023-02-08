@@ -54,11 +54,11 @@ fn main() {
     ];
     let world = World::new(rules);
 
-    world.run(&[data! {(zebra {h} {w} {z})}],&|c| for d in c {println!("{}", d)});
+    world.run(&[data! {(zebra {h} {w} {z})}],|c| for d in c {println!("{}", d)});
 
     let s = std::time::Instant::now();
     for _ in 0..1000 {
-        world.run(&[data! {(zebra {h} {w} {z})}],&|_| {});
+        world.run(&[data! {(zebra {h} {w} {z})}],|_| {});
     }
     dbg!(s.elapsed());
 }

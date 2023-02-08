@@ -35,7 +35,7 @@ fn main() {
     // dbg!(&rules);
     let world = World::new(rules);
 
-    world.run(&[data! {(add (s zero) (s (s zero)) {})}], &|c| {
+    world.run(&[data! {(add (s zero) (s (s zero)) {})}], |c| {
         for d in c {
             println!("{}", d)
         }
@@ -43,7 +43,7 @@ fn main() {
     println!();
     world.run(
         &[data! {(mul (s (s (s zero))) (s (s (s (s zero)))) {})}],
-        &|c| {
+        |c| {
             for d in c {
                 println!("{}", d)
             }
@@ -55,7 +55,7 @@ fn main() {
             data! {(mul (s (s (s zero))) (s (s (s (s zero)))) {a})}, // 3 * 4
             data! {(div (s {a}) (s (s (s zero))) {b} {c})},          // (12 + 1) / 3
         ],
-        &|c| {
+        |c| {
             for d in c {
                 println!("{}", d)
             }
