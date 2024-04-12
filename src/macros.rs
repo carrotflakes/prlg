@@ -21,6 +21,9 @@ macro_rules! sym {
     ($i:ident) => {
         ::prlg::user_data::UserData::Symbol(stringify!($i).to_string())
     };
+    ($l:literal) => {
+        ::prlg::user_data::UserData::Symbol($l.to_string())
+    };
 }
 
 #[macro_export]
@@ -45,6 +48,9 @@ macro_rules! data {
     };
     ($i:ident) => {
         sym!($i)
+    };
+    ($l:literal) => {
+        sym!($l)
     };
 }
 
