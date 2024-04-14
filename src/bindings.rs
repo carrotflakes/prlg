@@ -65,11 +65,6 @@ impl<'a> Binder<'a> {
         Instance::new(data, self.bindings_len)
     }
 
-    #[inline]
-    pub fn instances(&self, data: &[Data]) -> Vec<Instance> {
-        data.iter().map(|d| self.instance(d)).collect()
-    }
-
     pub fn data(&self, instance: Instance) -> Data {
         match &instance.data {
             Data::Variable(n) => {
