@@ -8,51 +8,50 @@ pub struct Runtime<'a, F: FnMut(&[Data])> {
     world: &'a World,
     initial_goals: &'a [Data],
     resolved_fn: F,
+    goals: Vec<Instance>,
 }
 
 impl<'a, F: FnMut(&[Data])> Runtime<'a, F> {
     pub fn run(world: &'a World, initial_goals: &'a [Data], resolved_fn: F) {
-        let base = initial_goals.iter().map(|d| d.max_var()).max().unwrap_or(0);
+        let var_num = initial_goals.iter().map(|d| d.max_var()).max().unwrap_or(0);
         let mut bindings = Bindings::new();
-        let mut binder = bindings.binder();
-        let mut goals: Vec<_> = initial_goals.iter().map(|d| binder.instance(d)).collect();
-        binder.alloc(base);
+        let mut binder = bindings.binder(var_num);
+        let goals = initial_goals.iter().map(|d| binder.instance(d)).collect();
         Self {
             world,
             initial_goals,
             resolved_fn,
+            goals,
         }
-        .step(&mut goals, &mut binder);
+        .step(&mut binder);
     }
 
-    #[inline]
-    fn step(&mut self, goals: &mut Vec<Instance>, binder: &mut Binder) {
-        if let Some(goal) = goals.pop() {
-            let mut binder = binder.child();
-            let goal_num = goals.len();
+    fn step(&mut self, binder: &mut Binder) {
+        if let Some(goal) = self.goals.pop() {
+            let goal_num = self.goals.len();
 
             for rule_index in self.get_rules(&goal) {
                 // for rule_index in 0..self.world.rules.len() {
                 let rule = &self.world.rules[rule_index];
+                let mut binder = binder.child(rule.var_num);
                 let head = binder.instance(&rule.head);
-                binder.alloc(rule.head_var_num);
                 if binder.unify(goal.clone(), head) {
-                    goals.extend(rule.body.iter().map(|d| binder.instance(d)));
-                    binder.alloc(rule.body_var_num);
-                    self.step(goals, &mut binder);
-                    goals.truncate(goal_num);
+                    self.goals
+                        .extend(rule.body.iter().map(|d| binder.instance(d)));
+                    self.step(&mut binder);
+                    self.goals.truncate(goal_num);
                 }
-                binder.rewind();
             }
 
-            goals.push(goal);
+            self.goals.push(goal);
         } else {
-            let datas = self
+            // All goals are resolved
+            let datas: Vec<_> = self
                 .initial_goals
                 .iter()
                 .map(|d| binder.data(Instance::new(d, 0)))
-                .collect::<Vec<_>>();
-            (self.resolved_fn)(datas.as_slice());
+                .collect();
+            (self.resolved_fn)(&datas);
         }
     }
 

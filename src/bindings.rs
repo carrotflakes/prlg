@@ -9,7 +9,6 @@ pub struct Instance {
 }
 
 impl Instance {
-    #[inline]
     pub fn new(data: &Data, base: usize) -> Instance {
         Instance {
             data: data.get_ref(),
@@ -20,8 +19,13 @@ impl Instance {
     pub fn data(&self) -> &Data {
         self.data
     }
+
+    pub fn eq(&self, other: &Instance) -> bool {
+        self.base == other.base && self.data as *const Data == other.data
+    }
 }
 
+/// Bindings keeps bound variables and enables rewinding to a previous state.
 pub struct Bindings {
     bindings: Vec<Option<Instance>>,
     indices: Vec<usize>,
@@ -35,12 +39,31 @@ impl Bindings {
         }
     }
 
-    pub fn binder<'a>(&'a mut self) -> Binder<'a> {
+    pub fn binder<'a>(&'a mut self, size: usize) -> Binder<'a> {
+        let bindings_len = self.bindings.len();
+        let indices_len = self.indices.len();
+
+        // Allocate
+        self.bindings.resize(bindings_len + size, None);
+
         Binder {
-            bindings_len: self.bindings.len(),
-            indices_len: self.indices.len(),
+            bindings_len,
+            indices_len,
             bindings: self,
         }
+    }
+
+    fn bind(&mut self, var_n: usize, instance: Instance) {
+        self.bindings[var_n] = Some(instance);
+        self.indices.push(var_n);
+    }
+
+    fn rewind(&mut self, bindings_len: usize, indices_len: usize) {
+        for idx in &self.indices[indices_len..] {
+            self.bindings[*idx] = None;
+        }
+        self.indices.truncate(indices_len);
+        self.bindings.truncate(bindings_len);
     }
 }
 
@@ -51,16 +74,10 @@ pub struct Binder<'a> {
 }
 
 impl<'a> Binder<'a> {
-    #[inline]
-    pub fn child(&mut self) -> Binder {
-        Binder {
-            bindings_len: self.bindings.bindings.len(),
-            indices_len: self.bindings.indices.len(),
-            bindings: self.bindings,
-        }
+    pub fn child(&mut self, size: usize) -> Binder {
+        self.bindings.binder(size)
     }
 
-    #[inline]
     pub fn instance(&self, data: &Data) -> Instance {
         Instance::new(data, self.bindings_len)
     }
@@ -83,8 +100,7 @@ impl<'a> Binder<'a> {
         }
     }
 
-    #[inline]
-    pub fn resolve(&self, mut instance: Instance) -> Instance {
+    fn resolve(&self, mut instance: Instance) -> Instance {
         loop {
             if let Data::Variable(n) = instance.data {
                 if let Some(d) = &self.bindings.bindings[instance.base + n] {
@@ -97,22 +113,21 @@ impl<'a> Binder<'a> {
         instance
     }
 
-    #[inline]
     pub fn unify(&mut self, mut left: Instance, mut right: Instance) -> bool {
         left = self.resolve(left);
         right = self.resolve(right);
 
-        if left.base == right.base && left.data as *const Data == right.data {
+        if left.eq(&right) {
             return true;
         }
 
         match (&left.data, &right.data) {
             (Data::Variable(n), _) => {
-                self.bind(left.base + n, right);
+                self.bindings.bind(left.base + n, right);
                 true
             }
             (_, Data::Variable(n)) => {
-                self.bind(right.base + n, left);
+                self.bindings.bind(right.base + n, left);
                 true
             }
 
@@ -131,35 +146,10 @@ impl<'a> Binder<'a> {
             (Data::Term(_), Data::Symbol(_)) => false,
         }
     }
-
-    #[inline]
-    pub fn bind(&mut self, var_n: usize, instance: Instance) {
-        self.bindings.bindings[var_n] = Some(instance);
-        self.bindings.indices.push(var_n);
-    }
-
-    #[inline]
-    pub fn alloc(&mut self, len: usize) {
-        self.bindings.bindings.resize(self.bindings_len + len, None);
-    }
-
-    #[inline]
-    pub fn dealloc(&mut self) {
-        self.bindings.bindings.truncate(self.bindings_len);
-    }
-
-    #[inline]
-    pub fn rewind(&mut self) {
-        for idx in &self.bindings.indices[self.indices_len..] {
-            self.bindings.bindings[*idx] = None;
-        }
-        self.bindings.indices.truncate(self.indices_len);
-    }
 }
 
 impl<'a> Drop for Binder<'a> {
-    #[inline]
     fn drop(&mut self) {
-        self.dealloc()
+        self.bindings.rewind(self.bindings_len, self.indices_len);
     }
 }

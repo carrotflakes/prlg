@@ -5,8 +5,7 @@ use crate::{data::Data, rule_map::RuleMap, runtime::Runtime, user_data::UserData
 pub struct Rule {
     pub head: Data,
     pub body: Vec<Data>,
-    pub head_var_num: usize,
-    pub body_var_num: usize,
+    pub var_num: usize,
 }
 
 impl Rule {
@@ -18,15 +17,8 @@ impl Rule {
         let mut it = v.iter().map(|x| scope.new_data(x, intern));
         let head = it.next().unwrap();
         let body = it.rev().collect::<Vec<_>>();
-        let head_var_num = head.max_var();
-        let body_var_num = body
-            .iter()
-            .map(|x| x.max_var())
-            .max()
-            .unwrap_or(head_var_num);
         Rule {
-            head_var_num,
-            body_var_num,
+            var_num: scope.size(),
             head,
             body,
         }
@@ -65,12 +57,16 @@ impl VariableScope {
         VariableScope(Default::default())
     }
 
+    pub fn size(&self) -> usize {
+        self.0.len()
+    }
+
     pub fn new_data(
         &mut self,
         data: &UserData,
         intern: &mut impl FnMut(Rc<String>) -> Rc<String>,
     ) -> Data {
-        let n = self.0.len();
+        let n = self.size();
         match data {
             UserData::Variable(v) => self
                 .0
@@ -90,9 +86,9 @@ impl VariableScope {
     pub fn new_data_vec(
         &mut self,
         slice: &[UserData],
-        get_str: &mut impl FnMut(Rc<String>) -> Rc<String>,
+        intern: &mut impl FnMut(Rc<String>) -> Rc<String>,
     ) -> Vec<Data> {
-        slice.iter().map(|x| self.new_data(x, get_str)).collect()
+        slice.iter().map(|x| self.new_data(x, intern)).collect()
     }
 }
 

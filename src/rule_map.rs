@@ -32,13 +32,11 @@ impl RuleMap {
     }
 }
 
-fn unify(left: &Data, right: &Data) -> bool{
+fn unify(left: &Data, right: &Data) -> bool {
     let mut bindings = Bindings::new();
-    let mut binder = bindings.binder();
+    let mut binder = bindings.binder(left.max_var());
     let left = binder.instance(left);
-    binder.alloc(left.data().max_var());
-    let mut binder = binder.child();
+    let mut binder = binder.child(right.max_var());
     let right = binder.instance(right);
-    binder.alloc(right.data().max_var());
     binder.unify(left, right)
 }

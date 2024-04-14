@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate prlg;
 
-use prlg::{World, interactive_runtime::InteractiveRuntime, world::VariableScope};
+use prlg::{interactive_runtime::InteractiveRuntime, world::VariableScope, World};
 
 fn main() {
     let rules = rules![
@@ -55,8 +55,7 @@ fn main() {
     let world = World::new(rules);
 
     let data_slice = &[data! {(zebra {h} {w} {z})}];
-    let goals =
-    VariableScope::new().new_data_vec(data_slice, &mut |s| world.symbol_scope.get(s));
+    let goals = VariableScope::new().new_data_vec(data_slice, &mut |s| world.symbol_pool.get(s));
 
     InteractiveRuntime::new(&world).run(goals);
 }

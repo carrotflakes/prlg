@@ -27,24 +27,20 @@ impl<'a> InteractiveRuntime<'a> {
         let max_var = goals.iter().map(|d| d.max_var()).max().unwrap_or(0);
         let goal = goals.remove(n);
         let mut bindings = Bindings::new();
-        let mut binder = bindings.binder();
+        let mut binder = bindings.binder(max_var);
         let left = binder.instance(&goal);
         let rest_goals: Vec<_> = goals.iter().map(|d| binder.instance(d)).collect();
-        binder.alloc(max_var);
         let mut candidates: Vec<(Vec<Data>, Vec<Data>)> = self
             .world
             .rules
             .iter()
             .filter_map(|rule| {
-                let mut binder = binder.child();
+                let mut binder = binder.child(rule.var_num);
                 let right = binder.instance(&rule.head);
-                binder.alloc(rule.head_var_num);
                 if binder.unify(left.clone(), right) {
-                    binder.alloc(rule.body_var_num);
                     let body: Vec<_> = rule.body.iter().map(|d| binder.instance(d)).collect();
                     let subgoals: Vec<_> = body.into_iter().rev().map(|i| binder.data(i)).collect();
                     let rest_goals = rest_goals.iter().map(|i| binder.data(i.clone())).collect();
-                    binder.rewind();
                     Some((subgoals, rest_goals))
                 } else {
                     None
