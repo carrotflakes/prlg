@@ -10,9 +10,9 @@ pub enum Data {
 impl Data {
     pub(crate) fn max_var(&self) -> usize {
         match self {
-            Data::Variable(n) => *n,
+            Data::Variable(n) => *n + 1,
             Data::Symbol(_) => 0,
-            Data::Term(v) => v.iter().map(|x| x.max_var() + 1).max().unwrap_or(0),
+            Data::Term(v) => v.iter().map(|x| x.max_var()).max().unwrap_or(0),
         }
     }
 
@@ -28,8 +28,21 @@ impl std::fmt::Display for Data {
             Data::Variable(n) => write!(f, "{{{}}}", n),
             Data::Symbol(s) => write!(f, "{}", s),
             Data::Term(v) => {
-                if v.first().map(|d| if let Data::Symbol(s) = d {s.as_str() == "cons" } else {false}).unwrap_or(false) {
-                    fn g(f: &mut std::fmt::Formatter<'_>, d: &Data, first: bool) -> std::fmt::Result {
+                if v.first()
+                    .map(|d| {
+                        if let Data::Symbol(s) = d {
+                            s.as_str() == "cons"
+                        } else {
+                            false
+                        }
+                    })
+                    .unwrap_or(false)
+                {
+                    fn g(
+                        f: &mut std::fmt::Formatter<'_>,
+                        d: &Data,
+                        first: bool,
+                    ) -> std::fmt::Result {
                         if let Data::Symbol(s) = d {
                             if s.as_str() == "nil" {
                                 return write!(f, "]");
@@ -54,9 +67,9 @@ impl std::fmt::Display for Data {
                 write!(f, "(")?;
                 if let Some(d) = v.first() {
                     write!(f, "{}", d)?;
-                }
-                for d in &v[1..] { // TODO: check length
-                    write!(f, " {}", d)?;
+                    for d in &v[1..] {
+                        write!(f, " {}", d)?;
+                    }
                 }
                 write!(f, ")")
             }
