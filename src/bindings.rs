@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::data::Data;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Instance {
     data: &'static Data,
     base: usize,
@@ -53,9 +53,35 @@ impl Bindings {
         }
     }
 
-    fn bind(&mut self, var_n: usize, instance: Instance) {
-        self.bindings[var_n] = Some(instance);
-        self.indices.push(var_n);
+    pub fn size(&self) -> usize {
+        self.bindings.len()
+    }
+
+    pub fn get_data(&self, idx: usize) -> Option<Data> {
+        self.bindings[idx].as_ref().map(|i| self.data(i.clone()))
+    }
+
+    pub fn data(&self, instance: Instance) -> Data {
+        match &instance.data {
+            Data::Variable(n) => {
+                if let Some(d) = &self.bindings[instance.base + n] {
+                    self.data(d.clone())
+                } else {
+                    instance.data.clone()
+                }
+            }
+            Data::Term(ds) => Data::Term(
+                ds.iter()
+                    .map(|d| self.data(Instance::new(d, instance.base)))
+                    .collect(),
+            ),
+            _ => instance.data.clone(),
+        }
+    }
+
+    fn bind(&mut self, idx: usize, instance: Instance) {
+        self.bindings[idx] = Some(instance);
+        self.indices.push(idx);
     }
 
     fn rewind(&mut self, bindings_len: usize, indices_len: usize) {
@@ -78,26 +104,16 @@ impl<'a> Binder<'a> {
         self.bindings.binder(size)
     }
 
+    pub fn bindings(&self) -> &Bindings {
+        self.bindings
+    }
+
     pub fn instance(&self, data: &Data) -> Instance {
         Instance::new(data, self.bindings_len)
     }
 
     pub fn data(&self, instance: Instance) -> Data {
-        match &instance.data {
-            Data::Variable(n) => {
-                if let Some(d) = &self.bindings.bindings[instance.base + n] {
-                    self.data(d.clone())
-                } else {
-                    instance.data.clone()
-                }
-            }
-            Data::Term(ds) => Data::Term(
-                ds.iter()
-                    .map(|d| self.data(Instance::new(d, instance.base)))
-                    .collect(),
-            ),
-            _ => instance.data.clone(),
-        }
+        self.bindings.data(instance)
     }
 
     fn resolve(&self, mut instance: Instance) -> Instance {

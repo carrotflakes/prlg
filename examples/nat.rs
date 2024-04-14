@@ -18,9 +18,11 @@ fn main() {
 
         (le {x} {y}) {
             (add {x} {} {y})
+            cut
         }
         (lt {x} (s {y})) {
             (add {x} {} {y})
+            cut
         }
 
         (div {x} {y} zero {x}) {

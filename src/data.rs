@@ -16,6 +16,13 @@ impl Data {
         }
     }
 
+    pub fn as_symbol(&self) -> Option<&Rc<String>> {
+        match self {
+            Data::Symbol(s) => Some(s),
+            _ => None,
+        }
+    }
+
     #[inline]
     pub(crate) fn get_ref(&self) -> &'static Data {
         unsafe { std::mem::transmute::<_, &'static Data>(self) }
