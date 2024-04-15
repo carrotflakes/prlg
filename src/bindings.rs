@@ -3,17 +3,14 @@ use std::rc::Rc;
 use crate::data::Data;
 
 #[derive(Debug, Clone, Copy)]
-pub struct Instance {
-    data: &'static Data,
+pub struct Instance<'a> {
+    data: &'a Data,
     base: usize,
 }
 
-impl Instance {
-    pub fn new(data: &Data, base: usize) -> Instance {
-        Instance {
-            data: data.get_ref(),
-            base,
-        }
+impl<'a> Instance<'a> {
+    pub fn new(data: &'a Data, base: usize) -> Self {
+        Instance { data, base }
     }
 
     pub fn data(&self) -> &Data {
@@ -26,13 +23,13 @@ impl Instance {
 }
 
 /// Bindings keeps bound variables and enables rewinding to a previous state.
-pub struct Bindings {
-    bindings: Vec<Option<Instance>>,
+pub struct Bindings<'a> {
+    bindings: Vec<Option<Instance<'a>>>,
     indices: Vec<usize>,
     stack: Vec<(usize, usize)>,
 }
 
-impl Bindings {
+impl<'a> Bindings<'a> {
     pub fn new() -> Self {
         Self {
             bindings: Vec::new(),
@@ -57,7 +54,7 @@ impl Bindings {
         }
     }
 
-    pub fn instance(&self, data: &Data) -> Instance {
+    pub fn instance(&self, data: &'a Data) -> Instance<'a> {
         Instance::new(
             data,
             self.stack
@@ -66,7 +63,7 @@ impl Bindings {
         )
     }
 
-    pub fn unify(&mut self, mut left: Instance, mut right: Instance) -> bool {
+    pub fn unify(&mut self, mut left: Instance<'a>, mut right: Instance<'a>) -> bool {
         left = self.resolve(left);
         right = self.resolve(right);
 
@@ -100,7 +97,7 @@ impl Bindings {
         }
     }
 
-    fn resolve(&self, mut instance: Instance) -> Instance {
+    fn resolve(&self, mut instance: Instance<'a>) -> Instance<'a> {
         loop {
             if let Data::Variable(n) = instance.data {
                 if let Some(i) = self.bindings[instance.base + n] {
@@ -121,7 +118,7 @@ impl Bindings {
         self.bindings[idx].as_ref().map(|&i| self.data(i))
     }
 
-    pub fn data(&self, instance: Instance) -> Data {
+    pub fn data(&self, instance: Instance<'a>) -> Data {
         match &instance.data {
             Data::Variable(n) => {
                 if let Some(i) = self.bindings[instance.base + n] {
@@ -139,7 +136,7 @@ impl Bindings {
         }
     }
 
-    fn bind(&mut self, idx: usize, instance: Instance) {
+    fn bind(&mut self, idx: usize, instance: Instance<'a>) {
         self.bindings[idx] = Some(instance);
         self.indices.push(idx);
     }

@@ -5,16 +5,16 @@ use crate::{
 };
 
 pub struct Runtime<'a, F: FnMut(&[Data])> {
-    initial_goals: Vec<Instance>,
+    initial_goals: Vec<Instance<'a>>,
     resolved_fn: F,
-    goals: Vec<Instance>,
-    bindings: Bindings,
+    goals: Vec<Instance<'a>>,
+    bindings: Bindings<'a>,
     steps: Vec<Step<'a>>,
     cut: std::rc::Rc<String>,
 }
 
 struct Step<'a> {
-    goal: Instance,
+    goal: Instance<'a>,
     goal_index: usize,
     rule_indices: std::slice::Iter<'a, usize>,
 }
