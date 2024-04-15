@@ -2,11 +2,17 @@ use std::collections::HashMap;
 
 use crate::{bindings::Bindings, data::Data, world::Rule};
 
-pub struct RuleMap(HashMap<*const Data, Vec<usize>>);
+pub struct RuleMap {
+    map: HashMap<*const Data, Vec<usize>>,
+    all: Vec<usize>,
+}
 
 impl RuleMap {
     pub fn new() -> Self {
-        RuleMap(Default::default())
+        RuleMap {
+            map: Default::default(),
+            all: Vec::new(),
+        }
     }
 
     pub fn from_rules(rules: &Vec<Rule>) -> Self {
@@ -23,12 +29,15 @@ impl RuleMap {
                 map.insert(key, rule_indices);
             }
         }
-        RuleMap(map)
+        RuleMap {
+            map,
+            all: (0..rules.len()).collect(),
+        }
     }
 
     #[inline]
-    pub fn get(&self, data: *const Data) -> Option<&[usize]> {
-        self.0.get(&data).map(|x| x.as_slice())
+    pub fn get(&self, data: *const Data) -> &[usize] {
+        self.map.get(&data).unwrap_or(&self.all)
     }
 }
 
