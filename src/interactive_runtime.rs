@@ -27,20 +27,24 @@ impl<'a> InteractiveRuntime<'a> {
         let max_var = goals.iter().map(|d| d.max_var()).max().unwrap_or(0);
         let goal = goals.remove(n);
         let mut bindings = Bindings::new();
-        let mut binder = bindings.binder(max_var);
-        let left = binder.instance(&goal);
-        let rest_goals: Vec<_> = goals.iter().map(|d| binder.instance(d)).collect();
+        bindings.push(max_var);
+        let left = bindings.instance(&goal);
+        let rest_goals: Vec<_> = goals.iter().map(|d| bindings.instance(d)).collect();
         let mut candidates: Vec<(Vec<Data>, Vec<Data>)> = self
             .world
             .rules
             .iter()
             .filter_map(|rule| {
-                let mut binder = binder.child(rule.var_num);
-                let right = binder.instance(&rule.head);
-                if binder.unify(left.clone(), right) {
-                    let body: Vec<_> = rule.body.iter().map(|d| binder.instance(d)).collect();
-                    let subgoals: Vec<_> = body.into_iter().rev().map(|i| binder.data(i)).collect();
-                    let rest_goals = rest_goals.iter().map(|i| binder.data(i.clone())).collect();
+                bindings.push(rule.var_num);
+                let right = bindings.instance(&rule.head);
+                if bindings.unify(left.clone(), right) {
+                    let body: Vec<_> = rule.body.iter().map(|d| bindings.instance(d)).collect();
+                    let subgoals: Vec<_> =
+                        body.into_iter().rev().map(|i| bindings.data(i)).collect();
+                    let rest_goals = rest_goals
+                        .iter()
+                        .map(|i| bindings.data(i.clone()))
+                        .collect();
                     Some((subgoals, rest_goals))
                 } else {
                     None

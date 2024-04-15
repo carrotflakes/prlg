@@ -43,9 +43,9 @@ impl RuleMap {
 
 fn unify(left: &Data, right: &Data) -> bool {
     let mut bindings = Bindings::new();
-    let mut binder = bindings.binder(left.max_var());
-    let left = binder.instance(left);
-    let mut binder = binder.child(right.max_var());
-    let right = binder.instance(right);
-    binder.unify(left, right)
+    bindings.push(left.max_var());
+    let left = bindings.instance(left);
+    bindings.push(right.max_var());
+    let right = bindings.instance(right);
+    bindings.unify(left, right)
 }
