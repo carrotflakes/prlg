@@ -4,7 +4,7 @@ use std::rc::Rc;
 pub enum Data {
     Variable(usize),
     Symbol(Rc<String>),
-    Term(Vec<Data>),
+    Term(Box<[Data]>),
 }
 
 impl Data {
