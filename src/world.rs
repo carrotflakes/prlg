@@ -4,7 +4,7 @@ use crate::{data::Data, rule_map::RuleMap, runtime::Runtime, user_data::UserData
 
 pub struct Rule {
     pub head: Data,
-    pub body: Vec<Data>,
+    pub body: Box<[Data]>,
     pub var_num: usize,
 }
 
@@ -16,7 +16,7 @@ impl Rule {
         let mut scope = VariableScope::new();
         let mut it = v.iter().map(|x| scope.new_data(x, intern));
         let head = it.next().unwrap();
-        let body = it.rev().collect::<Vec<_>>();
+        let body = it.rev().collect();
         Rule {
             var_num: scope.size(),
             head,

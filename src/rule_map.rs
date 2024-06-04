@@ -18,7 +18,7 @@ impl RuleMap {
     pub fn from_rules(rules: &Vec<Rule>) -> Self {
         let mut map = HashMap::<*const Data, Vec<usize>>::new();
         for rule in rules {
-            for sub_goal in &rule.body {
+            for sub_goal in rule.body.iter() {
                 let key = sub_goal as *const Data;
                 let mut rule_indices = Vec::new();
                 for (i, rule) in rules.iter().enumerate() {
